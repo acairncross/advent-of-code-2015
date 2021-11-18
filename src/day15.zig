@@ -39,11 +39,16 @@ pub fn main() !void {
     _ = reader;
     var buffer: [1024]u8 = undefined;
 
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    arena.deinit();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+
+    var arena = std.heap.ArenaAllocator.init(&gpa.allocator);
+    defer arena.deinit();
+
     var arena_allocator = &arena.allocator;
     var vs = ArrayList(V5).init(arena_allocator);
     defer vs.deinit();
+
     while (try reader.readUntilDelimiterOrEof(&buffer, '\n')) |line| {
         var tokens = std.mem.tokenize(u8, line, ":");
         _ = tokens.next(); // "Ingredient: "
