@@ -22,8 +22,12 @@ fn clampV5(lo: i64, v: V5) V5 {
     return V5{ @maximum(lo, v[0]), @maximum(lo, v[1]), @maximum(lo, v[2]), @maximum(lo, v[3]), @maximum(lo, v[4]) };
 }
 
-fn productV5(v: V5) i64 {
-    return v[0] * v[1] * v[2] * v[3]; //
+fn product(v: []i64) i64 {
+    var total: i64 = 1;
+    for (v) |x| {
+        total *= x;
+    }
+    return total;
 }
 
 pub fn main() !void {
@@ -75,7 +79,8 @@ pub fn main() !void {
                 const l: usize = num_teaspoons - i - j - k;
                 const z: V5 = addV5(scaleV5(@intCast(i64, l), vs.items[3]), y);
 
-                const score = productV5(clampV5(0, z));
+                // Product of only the first 4 values
+                const score = product(clampV5(0, z)[0..4]);
                 if (score > best_score) {
                     std.debug.print("{d}\n", .{score});
                     std.debug.print("{d} {d} {d} {d}\n", .{ i, j, k, l });
