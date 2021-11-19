@@ -30,6 +30,37 @@ fn product(v: []i64) i64 {
     return total;
 }
 
+fn sum(v: []i64) i64 {
+    var total: i64 = 0;
+    for (v) |x| {
+        total += x;
+    }
+    return total;
+}
+
+fn do_score(ingredients: []V5, teaspoons: []i64) i64 {
+    var v: V5 = [_]i64{0} ** 5;
+    var i: usize = 0;
+    while (i < teaspoons.len) : (i += 1) {
+        v = addV5(v, scaleV5(teaspoons[i], ingredients[i]));
+    }
+    return product(clampV5(0, v)[0..4]);
+}
+
+fn solve(ingredients: []V5, teaspoons: []i64, index: usize) i64 {
+    var used_teaspoons: i64 = sum(teaspoons[0..index]);
+    if (index == ingredients.len) {
+        return do_score(ingredients, teaspoons);
+    } else {
+        var max_score: i64 = 0;
+        teaspoons[index] = 0;
+        while (teaspoons[index] + used_teaspoons <= num_teaspoons) : (teaspoons[index] += 1) {
+            max_score = @maximum(max_score, solve(ingredients, teaspoons, index + 1));
+        }
+        return max_score;
+    }
+}
+
 pub fn main() !void {
     const file =
         try std.fs.cwd().openFile("inputs/day15.txt", .{ .read = true });
@@ -71,27 +102,8 @@ pub fn main() !void {
         std.debug.print("{any}\n", .{addV5(v, v)});
     }
 
-    var best_score: i64 = 0;
-    var i: usize = 0;
-    while (i < num_teaspoons) : (i += 1) {
-        const w = scaleV5(@intCast(i64, i), vs.items[0]);
-        var j: usize = 0;
-        while (j < num_teaspoons - i) : (j += 1) {
-            const x = addV5(scaleV5(@intCast(i64, j), vs.items[1]), w);
-            var k: usize = 0;
-            while (k < num_teaspoons - i - j) : (k += 1) {
-                const y = addV5(scaleV5(@intCast(i64, k), vs.items[2]), x);
-                const l: usize = num_teaspoons - i - j - k;
-                const z: V5 = addV5(scaleV5(@intCast(i64, l), vs.items[3]), y);
-
-                // Product of only the first 4 values
-                const score = product(clampV5(0, z)[0..4]);
-                if (score > best_score) {
-                    std.debug.print("{d}\n", .{score});
-                    std.debug.print("{d} {d} {d} {d}\n", .{ i, j, k, l });
-                    best_score = score;
-                }
-            }
-        }
-    }
+    var teaspoons = ArrayList(i64).init(arena_allocator);
+    try teaspoons.resize(vs.items.len);
+    defer teaspoons.deinit();
+    std.debug.print("{d}\n", .{solve(vs.items, teaspoons.items, 0)});
 }
