@@ -22,23 +22,23 @@ fn clampV5(lo: i64, v: V5) V5 {
     return V5{ @maximum(lo, v[0]), @maximum(lo, v[1]), @maximum(lo, v[2]), @maximum(lo, v[3]), @maximum(lo, v[4]) };
 }
 
-fn product(v: []i64) i64 {
+fn product(xs: []i64) i64 {
     var total: i64 = 1;
-    for (v) |x| {
+    for (xs) |x| {
         total *= x;
     }
     return total;
 }
 
-fn sum(v: []i64) i64 {
+fn sum(xs: []i64) i64 {
     var total: i64 = 0;
-    for (v) |x| {
+    for (xs) |x| {
         total += x;
     }
     return total;
 }
 
-fn do_score(ingredients: []V5, teaspoons: []i64) i64 {
+fn score(ingredients: []V5, teaspoons: []i64) i64 {
     var v: V5 = [_]i64{0} ** 5;
     var i: usize = 0;
     while (i < teaspoons.len) : (i += 1) {
@@ -47,15 +47,34 @@ fn do_score(ingredients: []V5, teaspoons: []i64) i64 {
     return product(clampV5(0, v)[0..4]);
 }
 
-fn solve(ingredients: []V5, teaspoons: []i64, index: usize) i64 {
+fn calories(ingredients: []V5, teaspoons: []i64) i64 {
+    var total: i64 = 0;
+    var i: usize = 0;
+    while (i < teaspoons.len) : (i += 1) {
+        total += teaspoons[i] * ingredients[i][4];
+    }
+    return total;
+}
+
+// Only teaspoons[0..index] is valid when this is called
+fn solve(ingredients: []V5, teaspoons: []i64, index: usize, target_calories: ?i64) i64 {
     var used_teaspoons: i64 = sum(teaspoons[0..index]);
-    if (index == ingredients.len) {
-        return do_score(ingredients, teaspoons);
+    if (index + 1 == ingredients.len) {
+        teaspoons[index] = num_teaspoons - used_teaspoons;
+        if (target_calories) |cals| {
+            if (calories(ingredients, teaspoons) == cals) {
+                return score(ingredients, teaspoons);
+            } else {
+                return 0;
+            }
+        } else {
+            return score(ingredients, teaspoons);
+        }
     } else {
         var max_score: i64 = 0;
         teaspoons[index] = 0;
         while (teaspoons[index] + used_teaspoons <= num_teaspoons) : (teaspoons[index] += 1) {
-            max_score = @maximum(max_score, solve(ingredients, teaspoons, index + 1));
+            max_score = @maximum(max_score, solve(ingredients, teaspoons, index + 1, target_calories));
         }
         return max_score;
     }
@@ -67,17 +86,12 @@ pub fn main() !void {
     defer file.close();
 
     var reader = std.io.bufferedReader(file.reader()).reader();
-    _ = reader;
     var buffer: [1024]u8 = undefined;
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
 
-    var arena = std.heap.ArenaAllocator.init(&gpa.allocator);
-    defer arena.deinit();
-
-    var arena_allocator = &arena.allocator;
-    var vs = ArrayList(V5).init(arena_allocator);
+    var vs = ArrayList(V5).init(&gpa.allocator);
     defer vs.deinit();
 
     while (try reader.readUntilDelimiterOrEof(&buffer, '\n')) |line| {
@@ -90,20 +104,17 @@ pub fn main() !void {
         var index: u32 = 0;
         while (tokens.next()) |token| : (index += 1) {
             // Split property and value
-            var tokens2 = std.mem.tokenize(u8, token, " ");
-            _ = tokens2.next(); // property
-            v[index] = try std.fmt.parseInt(i64, tokens2.next().?, 10);
+            var pair_tokens = std.mem.tokenize(u8, token, " ");
+            _ = pair_tokens.next(); // property
+            v[index] = try std.fmt.parseInt(i64, pair_tokens.next().?, 10);
         }
 
         try vs.append(v);
     }
 
-    for (vs.items) |v| {
-        std.debug.print("{any}\n", .{addV5(v, v)});
-    }
-
-    var teaspoons = ArrayList(i64).init(arena_allocator);
+    var teaspoons = ArrayList(i64).init(&gpa.allocator);
     try teaspoons.resize(vs.items.len);
     defer teaspoons.deinit();
-    std.debug.print("{d}\n", .{solve(vs.items, teaspoons.items, 0)});
+    std.debug.print("{d}\n", .{solve(vs.items, teaspoons.items, 0, null)});
+    std.debug.print("{d}\n", .{solve(vs.items, teaspoons.items, 0, 500)});
 }
