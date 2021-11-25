@@ -1,6 +1,41 @@
 const std = @import("std");
 const num_aunts: u32 = 500;
 
+fn solve1(aunts: [num_aunts]std.StringHashMap(u32)) ?usize {
+    var i: usize = 0;
+    while (i < num_aunts) : (i += 1) {
+        if (aunts[i].get("children") orelse 3 != 3) continue;
+        if (aunts[i].get("cats") orelse 7 != 7) continue;
+        if (aunts[i].get("samoyeds") orelse 2 != 2) continue;
+        if (aunts[i].get("pomeranians") orelse 3 != 3) continue;
+        if (aunts[i].get("akitas") orelse 0 != 0) continue;
+        if (aunts[i].get("vizslas") orelse 0 != 0) continue;
+        if (aunts[i].get("goldfish") orelse 5 != 5) continue;
+        if (aunts[i].get("trees") orelse 3 != 3) continue;
+        if (aunts[i].get("cars") orelse 2 != 2) continue;
+        if (aunts[i].get("perfumes") orelse 1 != 1) continue;
+        return i + 1;
+    }
+    return null;
+}
+
+fn solve2(aunts: [num_aunts]std.StringHashMap(u32)) ?usize {
+    var i: usize = 0;
+    while (i < num_aunts) : (i += 1) {
+        if (aunts[i].get("children") orelse 3 != 3) continue;
+        if (aunts[i].get("cats") orelse 8 <= 7) continue;
+        if (aunts[i].get("samoyeds") orelse 2 != 2) continue;
+        if (aunts[i].get("pomeranians") orelse 2 >= 3) continue;
+        if (aunts[i].get("akitas") orelse 0 != 0) continue;
+        if (aunts[i].get("vizslas") orelse 0 != 0) continue;
+        if (aunts[i].get("goldfish") orelse 4 >= 5) continue;
+        if (aunts[i].get("trees") orelse 4 <= 3) continue;
+        if (aunts[i].get("cars") orelse 2 != 2) continue;
+        if (aunts[i].get("perfumes") orelse 1 != 1) continue;
+        return i + 1;
+    }
+    return null;
+}
 pub fn main() !void {
     const file =
         try std.fs.cwd().openFile("inputs/day16.txt", .{ .read = true });
@@ -12,62 +47,44 @@ pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
 
-    // var vs = ArrayList(V5).init(&gpa.allocator);
-    // defer vs.deinit();
+    var arena = std.heap.ArenaAllocator.init(&gpa.allocator);
+    defer arena.deinit();
 
     var aunts: [num_aunts]std.StringHashMap(u32) = undefined;
-    _ = aunts;
+    // We need to allocate memory for property names (to avoid pointing to the
+    // reader buffer, which won't be valid), so store the names in a map/set to
+    // only allocate each of them once
+    var propertyNames = std.StringHashMap(void).init(&arena.allocator);
 
     var line_num: usize = 0;
     while (try reader.readUntilDelimiterOrEof(&buffer, '\n')) |line| : (line_num += 1) {
         var pos: usize = 0;
+        // Skip everything up to the first colon
         while (line[pos] != ':') : (pos += 1) {}
-        pos += 2; // ": "
+        pos += 2; // Skip ": "
         var line_content = line[pos..];
 
-        aunts[line_num] = std.StringHashMap(u32).init(&gpa.allocator);
+        aunts[line_num] = std.StringHashMap(u32).init(&arena.allocator);
 
         var properties = std.mem.tokenize(u8, line_content, ",");
         while (properties.next()) |property| {
             var tokens = std.mem.tokenize(u8, property, ": ");
-            const propertyName = tokens.next().?;
+            const tempPropertyName = tokens.next().?;
 
-            const newPropertyName = try gpa.allocator.alloc(u8, propertyName.len);
-            for (propertyName) |c, i| newPropertyName[i] = c;
+            // If it's a property we haven't seen yet, allocate memory to store
+            // the name
+            if (!propertyNames.contains(tempPropertyName)) {
+                const newPropertyName = try arena.allocator.alloc(u8, tempPropertyName.len);
+                for (tempPropertyName) |c, i| newPropertyName[i] = c;
+                try propertyNames.put(newPropertyName, undefined);
+            }
 
-            std.debug.print("{s}|\n", .{newPropertyName});
-            std.debug.print("{d}\n", .{line_num});
+            const propertyName = propertyNames.getKey(tempPropertyName).?;
             const propertyValue = try std.fmt.parseInt(u32, tokens.next().?, 10);
-            try aunts[line_num].put(newPropertyName, propertyValue);
-            std.debug.print("{any}\n", .{aunts[line_num].get(newPropertyName)});
-            std.debug.print("{any}\n", .{aunts[line_num].get("children")});
+            try aunts[line_num].put(propertyName, propertyValue);
         }
     }
 
-    std.debug.print("{any}\n", .{aunts[0]});
-    std.debug.print("aunts[0].get(\"children\"): {any}\n", .{aunts[0].get("children")});
-
-    var i: usize = 0;
-    var answer: ?usize = null;
-    while (i < num_aunts) : (i += 1) {
-        // std.debug.print("{any}\n", .{aunts[i].get("children")});
-        if (aunts[i].get("children") orelse 3 != 3) continue;
-        if (aunts[i].get("cats") orelse 8 <= 7) continue;
-        if (aunts[i].get("samoyeds") orelse 2 != 2) continue;
-        if (aunts[i].get("pomeranians") orelse 2 >= 3) continue;
-        if (aunts[i].get("akitas") orelse 0 != 0) continue;
-        if (aunts[i].get("vizslas") orelse 0 != 0) continue;
-        if (aunts[i].get("goldfish") orelse 4 >= 5) continue;
-        if (aunts[i].get("trees") orelse 4 <= 3) continue;
-        if (aunts[i].get("cars") orelse 2 != 2) continue;
-        if (aunts[i].get("perfumes") orelse 1 != 1) continue;
-        answer = i;
-    }
-
-    std.debug.print("{d}\n", .{answer});
-
-    i = 0;
-    while (i < num_aunts) : (i += 1) {
-        aunts[i].deinit();
-    }
+    std.debug.print("{d}\n", .{solve1(aunts)});
+    std.debug.print("{d}\n", .{solve2(aunts)});
 }
